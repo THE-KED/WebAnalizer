@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <title>Web Analizer</title>
+</head>
+<body>
+    <header>
+        <div id="search--container" class="container">
+            <div class="logo">
+                <span>Web</span>
+                <span>Analizer</span>
+            </div>
+            <div class="form">
+                <form th:action="@{/index}" th:object="${url}" method="post">
+                    <input id="text--input" type="text" name="url"
+                           th:value="${url}" placeholder="Enter URL">
+                    <input id="btn--submite" type="submit" value="Analyze">
+                </form>
+            </div>
+        </div>
+    </header>
+    <div class="content">
+        <div class="table--wrapper">
+            <table th:each="info : ${info}">
+                <caption>Result of the analysis !</caption>
+                <thead>
+                <tr>
+                    <th scope="row">HTML Version : </th>
+                    <td th:text="${info.htmlVersion}"></td>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <th scope="row">Page Title : </th>
+                    <td th:text="${info.pageTitle}"></td>
+                </tr>
+                <tr>
+                    <th scope="row">Rubriques : </th>
+<!--                    <td th:text="${rubriques}"></td>-->
+                    <td class="sub--table--wrapper">
+                        <table class="sub--table">
+                            <tr th:each="rub, iterStat : ${info.rubriquesNumber}">
+                                <td th:if="${rub[0]!=0}" th:text="'Rubrique level h' +${iterStat.index +1}+ ' : ' + ${rub[0]}"></td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">Links : </th>
+                    <td class="sub--table--wrapper">
+                        <table class="sub--table">
+                            <tr><td th:text="'interns links numbers : ' + ${internsLinksNb}"></td></tr>
+                            <tr><td th:text="'externs links numbers : ' + ${externsLinksNb}"></td></tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">Auth form : </th>
+                    <td th:if="${info.hadAuthForm}">this page dos have an authentification form</td>
+                    <td th:unless="${info.hadAuthForm}">this page dosen't have authentification form</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <span id="waiting--msg" class="undisplay">
+           Links validation in progress <span class="loader"></span>
+        </span>
+
+        <div class="table--wrapper">
+            <table id="prodTable">
+
+            </table>
+        </div>
+
+        <div class="alert" th:if="${error}!=''">
+            <h3>Error !</h3>
+            <span class="err--msg">
+                <p th:text="${error}"></p>
+            </span>
+        </div>
+    </div>
+    <script src="js/main.js"></script>
+</body>
+</html>
