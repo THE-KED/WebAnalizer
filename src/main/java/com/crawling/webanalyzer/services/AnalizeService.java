@@ -62,87 +62,61 @@ public class AnalizeService {
 
     //validations des liens de la page.
     @Async
-    public CompletableFuture<ArrayList<Link>> checkLinks() {
-        ArrayList<ArrayList<String>> linksLots = new ArrayList<ArrayList<String>>();
+    public CompletableFuture<ArrayList<Link>> checkLinks() throws ExecutionException, InterruptedException {
         ArrayList<String> allLinks = new ArrayList<String>();
         allLinks.addAll(this.links[0]);
         allLinks.addAll(this.links[1]);
-        List<Future<LinkChecking>> checkeds = new ArrayList<>();
-
-//        //decoupage de la liste des liens de la page en lot de 10 liens.
-//        int lastLotSize = allLinks.size()%10;
-//        for(int i = 0;i<allLinks.size()-lastLotSize;i+=10){
-//            ArrayList<String> tempList = new ArrayList<String>(allLinks.subList(i, i + 10));
-//            linksLots.add(tempList);
-//        }
-//        if (lastLotSize > 0){
-//            ArrayList<String> tempList = new ArrayList<String>(allLinks.subList((allLinks.size()-(lastLotSize + 1)),allLinks.size()));
-//            linksLots.add(tempList);
-//        }
-//        int i=0;
-//
-//        //creation et lancement des threads pour tester chacun un lot de liens.
-//        for (ArrayList<String> lot : linksLots) {
-//            i++;
-//          Runnable traitement = new Runnable() {
-//              @Override
-//              public void run() {
-//                  log.info("start");
-//                  for(String href : lot){
-//                      Link link = new Link(href);
-//                      try {
-//                          Jsoup.connect(link.getHref()).get();
-//                          link.validate();
-//                          link.setComment("Success");
-//                      } catch (IOException e) {
-//                          link.unvalidate();
-//                          link.setComment(e.getMessage());
-//                      }
-//                    checkedLinks.add(link);
-//                  }
-//                  log.info("Success");
-//              }
-//          };
-//          Thread thread = new Thread(traitement,"Thread "+i);
-//          log.info(thread.getName());
-//          thread.start();
-//        }
+//        List<Future<LinkChecking>> checkeds = new ArrayList<>();
+        CountDownLatch uncheckeds = new CountDownLatch(allLinks.size());
+//        log.info("Checking starting :{}",uncheckeds.getCount());
 
         //creations du thread pool
         ExecutorService cachedThreadPool = Executors.newCachedThreadPool();
 
         //soumissions des tache au threadPool
-        int index = 1;
+//        int index = 1;
         for(String link :allLinks){
-            log.info("link N"+index+" :");
-            LinkChecking traitement = new LinkChecking(link);
-            Future<LinkChecking> checked = cachedThreadPool.submit(traitement,traitement);
-            checkeds.add(checked);
-            index++;
+//            log.info("link N{} :", index);
+            Link lien = new Link(link);
+//            LinkChecking traitement = new LinkChecking(link);
+            CompletableFuture.supplyAsync(()->{
+                try {
+                    Jsoup.connect(lien.getHref())
+                            .userAgent("Chrome/91.0.4472.124")
+                            .timeout(30000).execute();
+                    lien.validate();
+                    lien.setComment("Success");
+                } catch (Exception e) {
+                    lien.unvalidate();
+                    lien.setComment(e.getMessage());
+                }
+                return lien;
+            },cachedThreadPool).thenAccept(respons -> {
+                this.checkedLinks.add(respons);
+                log.info("Checking End {}/{}",checkedLinks.size(),allLinks.size());
+                uncheckeds.countDown();
+            });
+//            log.info("Checking End {}/{}",checkedLinks.size(),allLinks.size());
+
+//            Future<LinkChecking> checked = cachedThreadPool.submit(traitement,traitement);?
+//            checkeds.add(checked);
+//            index++;
         }
+
+        uncheckeds.await();
+        log.info("Checked end {}/{}",this.checkedLinks.size(),allLinks.size());
 
         //attente de la fin des taches et recuperation des resultats
-        for(Future<LinkChecking> checked :checkeds){
-            try {
-                LinkChecking completed = checked.get();
-                this.checkedLinks.add(completed.getLink());
-            } catch (ExecutionException | InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-
-
-//        //attente que tous les threads se terminent.
-//        while (checkedLinks.size() < allLinks.size()) {
-//            log.info("Checked "+checkedLinks.size()+" links");
+//        for(Future<LinkChecking> checked :checkeds){
 //            try {
-//                Thread.sleep(200);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
+//                LinkChecking completed = checked.get();
+//                this.checkedLinks.add(completed.getLink());
+//            } catch (ExecutionException | InterruptedException e) {
+//                throw new RuntimeException(e);
 //            }
 //        }
-        log.info("Completed "+checkedLinks.size());
+
+        log.info("Completed {}", checkedLinks.size());
 
         return CompletableFuture.completedFuture(checkedLinks);
     }

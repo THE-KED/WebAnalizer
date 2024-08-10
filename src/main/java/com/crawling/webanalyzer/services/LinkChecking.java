@@ -4,7 +4,6 @@ import com.crawling.webanalyzer.models.Link;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 
-import java.io.IOException;
 
 @Slf4j
 public class LinkChecking implements Runnable{
@@ -32,10 +31,12 @@ public class LinkChecking implements Runnable{
 
     private void checkingProcess (){
         try {
-            Jsoup.connect(this.link.getHref()).timeout(30000).execute();
+            Jsoup.connect(this.link.getHref())
+                    .userAgent("Chrome/91.0.4472.124")
+                    .timeout(30000).execute();
             this.link.validate();
             this.link.setComment("Success");
-        } catch (IOException e) {
+        } catch (Exception e) {
             this.link.unvalidate();
             this.link.setComment(e.getMessage());
         }
