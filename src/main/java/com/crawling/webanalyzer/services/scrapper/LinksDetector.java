@@ -31,7 +31,7 @@ public class LinksDetector{
 
         for (Element element : elements){
             try {
-                log.info(element.absUrl("href"));
+//                log.info(element.absUrl("href"));
                 URL href = new URL(element.absUrl("href"));
                 if(href.getAuthority()!= null && href.getAuthority().equals(Domaine))
                     links[0].add(element.absUrl("href"));
