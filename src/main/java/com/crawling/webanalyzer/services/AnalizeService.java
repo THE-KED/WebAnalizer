@@ -8,6 +8,8 @@ import lombok.Data;
 import org.jsoup.nodes.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.annotation.SessionScope;
@@ -24,12 +26,23 @@ import java.util.concurrent.*;
 @Data
 public class AnalizeService {
 
+    @Autowired
+    private ForkJoinPool forkJoinPool;
+    @Autowired
+    private ExecutorService virtualThreadPool;
+    @Value("${maxLinkByThreads}")
+    private int maxLinkByThreads;
+    @Value("${requestTimeout}")
+    private int timeout;
+    @Value("${userAgent}")
+    private String userAgent;
+
     private static final Logger log = LoggerFactory.getLogger(AnalizeService.class);
     private PageInfos currentPageInfos;
     private Document currentPage;
     private String currentUrl;
     private List<String>[] links;
-    private ArrayList<Link> checkedLinks = new ArrayList<Link>();
+    private ArrayList<Link> checkedLinks = new ArrayList<>();
 
     private void init(){
         this.currentPageInfos=null;
@@ -45,7 +58,7 @@ public class AnalizeService {
     }
 
     //recupere les informations de la page (titre, version html, nombre de rubriques, presence d'un formulaire d'authentification)
-    public PageInfos loadInfos() throws MalformedURLException {
+    public void loadInfos() throws MalformedURLException {
         this.currentPageInfos = new PageInfos();
         this.currentPageInfos.setPageTitle(TitleDetector.detect(this.currentPage));
         this.currentPageInfos.setHtmlVersion(VersionDetector.detect(this.currentPage));
@@ -55,23 +68,29 @@ public class AnalizeService {
         String domain = new URL(this.currentUrl).getAuthority();
 
         this.links = LinksDetector.detect(this.currentPage, domain);
-        return this.currentPageInfos;
     }
 
 
 
     //validations des liens de la page.
     @Async
-    public CompletableFuture<ArrayList<Link>> checkLinks() throws ExecutionException, InterruptedException {
-        ArrayList<String> allLinks = new ArrayList<String>();
+    public CompletableFuture<ArrayList<Link>> checkLinks(){
+        ArrayList<String> allLinks = new ArrayList<>();
         allLinks.addAll(this.links[0]);
         allLinks.addAll(this.links[1]);
 
-        ForkJoinPool forkJoinPool = new ForkJoinPool();
-        CheckingTask checkingTask = new CheckingTask(allLinks,allLinks.size()-1,0,100,10000);
-        this.checkedLinks.addAll(forkJoinPool.invoke(checkingTask));
+        CheckingTask checkingTask = new CheckingTask(
+                allLinks,allLinks.size()-1,0,this.maxLinkByThreads,timeout,userAgent,this.virtualThreadPool);
+        List<CompletableFuture<Link>> futures = this.forkJoinPool.invoke(checkingTask);
 
-        return CompletableFuture.completedFuture(checkedLinks);
+        // Collecte des résultats de manière non bloquante
+        CompletableFuture<List<Link>> allResultsFuture = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                .thenApply(_ -> futures.stream()
+                        .map(CompletableFuture::join)
+                        .toList());
+        allResultsFuture.thenAccept(results -> this.checkedLinks.addAll(results));
+
+        return allResultsFuture.thenApply(_ -> this.checkedLinks);
     }
 
 

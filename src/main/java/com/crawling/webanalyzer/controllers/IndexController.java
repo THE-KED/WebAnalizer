@@ -1,14 +1,13 @@
 package com.crawling.webanalyzer.controllers;
 
 import com.crawling.webanalyzer.services.AnalizeService;
+import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
-
-import java.io.IOException;
 
 @Controller
 public class IndexController {
@@ -29,8 +28,8 @@ public class IndexController {
     }
 
     @PostMapping(name = "/index",path = "/index")
-    public String submit(@ModelAttribute("url") String url,Model model) throws IOException {
-        String err = "";
+    public String submit(@ModelAttribute("url") String url,Model model) {
+        String err;
         try {
             // chargement du document html dans le service.
             this.analizeService.loadPage(url);

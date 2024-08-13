@@ -1,87 +1,62 @@
 package com.crawling.webanalyzer.services.execution.tasks;
 
 import com.crawling.webanalyzer.models.Link;
+import com.crawling.webanalyzer.services.CheckingProcess;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jsoup.Jsoup;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 
 @Slf4j
-public class CheckingTask extends RecursiveTask<List<Link>> {
+@AllArgsConstructor
+public class CheckingTask extends RecursiveTask<List<CompletableFuture<Link>>> {
 
     private final List<String> links;
     private final int high;
     private final int low;
     private final int max;
-    private final int timeout;
+    private int timeout;
+    private String userAgent;
+    private final ExecutorService virtualThreadPool;
 
-    public CheckingTask (List<String> links, int high, int low, int max, int timeout) {
-        this.links = links;
-        this.high = high;
-        this.low = low;
-        this.max = max;
-        this.timeout = timeout;
-    }
 
     @Override
-    protected List<Link> compute() {
+    protected List<CompletableFuture<Link>> compute() {
 
         //si le nombre de lien est assez petite pour etre executer sur un thread
         if(this.links.size() <= this.max){
-            List<Link> result = new ArrayList<Link>();
-            ExecutorService virtualThreadPerTaskExecutor = Executors.newVirtualThreadPerTaskExecutor();
-            CountDownLatch countDownLatch = new CountDownLatch(this.links.size());
+            List<CompletableFuture<Link>> futures = new ArrayList<>();
 
             //verification des liens sur un thread virtuel' en parallèle sur un thread virtuel par lien'
             for(String href:this.links){
-                Link link = new Link(href);
-                CompletableFuture.supplyAsync(()->{
+                CheckingProcess checkingProcess = new CheckingProcess(href,timeout,userAgent);
+                CompletableFuture<Link> future = CompletableFuture.supplyAsync(()->{
                     try {
-                        Jsoup.connect(link.getHref())
-                                .userAgent("Chrome/91.0.4472.124")
-                                .timeout(this.timeout).execute();
-                        link.validate();
-                        link.setComment("Success");
-
-                    }catch (Exception e){
-                        link.unvalidate();
-                        link.setComment(e.getMessage());
+                        return checkingProcess.call();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
                     }
-                    return link;
-                }, virtualThreadPerTaskExecutor)
-                        .thenAccept(response ->{
-                            result.add(response);
-                            countDownLatch.countDown();
-                        });
-
-            }
-
-            //attente que tous les liens aient ete verifie' afin de terminer la tache recursive'
-            try {
-                countDownLatch.await();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+                }, virtualThreadPool).exceptionally(checkingProcess::checkingProcessFaild);
+                futures.add(future);
             }
             log.info("Recursive done");
-            return result;
+            return futures;
         }else {
             //si le nombre de lien est trop grand pour etre executer sur un thread
 
             int mid = (low + high) / 2;
             List<String> leftList = links.subList(low, mid);
             List<String> rightList = links.subList(mid,high);
-            CheckingTask leftTask = new CheckingTask(leftList,leftList.size()-1,0,max,timeout);
-            CheckingTask rightTask = new CheckingTask(rightList,rightList.size()-1,0,max,timeout);
+            CheckingTask leftTask = new CheckingTask(leftList,leftList.size()-1,0,max,timeout,userAgent,virtualThreadPool);
+            CheckingTask rightTask = new CheckingTask(rightList,rightList.size()-1,0,max,timeout,userAgent,virtualThreadPool);
             leftTask.fork();
-            List<Link> rightResult = rightTask.compute();
-            List<Link> leftResult = leftTask.join();
-            List<Link> result = new ArrayList<Link>();
-            result.addAll(leftResult);
-            result.addAll(rightResult);
+            List<CompletableFuture<Link>> futures = new ArrayList<>();
+            futures.addAll(rightTask.compute());
+            futures.addAll(leftTask.join());
 
-            return result;
+            return futures;
 
         }
 
