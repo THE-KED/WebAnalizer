@@ -15,8 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.context.annotation.SessionScope;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
@@ -58,14 +58,14 @@ public class AnalizeService {
     }
 
     //recupere les informations de la page (titre, version html, nombre de rubriques, presence d'un formulaire d'authentification)
-    public void loadInfos() throws MalformedURLException {
+    public void loadInfos() throws URISyntaxException {
         this.currentPageInfos = new PageInfos();
         this.currentPageInfos.setPageTitle(TitleDetector.detect(this.currentPage));
         this.currentPageInfos.setHtmlVersion(VersionDetector.detect(this.currentPage));
         this.currentPageInfos.setRubriquesNumber(RubriqueDetector.detect(this.currentPage));
         this.currentPageInfos.setHadAuthForm(AuthFormDetector.detect(this.currentPage));
 
-        String domain = new URL(this.currentUrl).getAuthority();
+        String domain = new URI(this.currentUrl).getAuthority();
 
         this.links = LinksDetector.detect(this.currentPage, domain);
     }
