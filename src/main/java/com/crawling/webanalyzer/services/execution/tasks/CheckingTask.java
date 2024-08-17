@@ -26,19 +26,20 @@ public class CheckingTask extends RecursiveTask<List<CompletableFuture<Link>>> {
     protected List<CompletableFuture<Link>> compute() {
 
         //si le nombre de lien est assez petite pour etre executer sur un thread
-        if(this.links.size() <= this.max){
+        if((high - low) <= max){
             List<CompletableFuture<Link>> futures = new ArrayList<>();
 
-            //verification des liens sur un thread virtuel' en parallèle sur un thread virtuel par lien'
-            for(String href:this.links){
-                CheckingProcess checkingProcess = new CheckingProcess(href,timeout,userAgent);
+            //verification des liens sur des threads virtuels
+            for(int i = low; i < high; i++){
+                CheckingProcess checkingProcess = new CheckingProcess(links.get(i),timeout,userAgent);
                 CompletableFuture<Link> future = CompletableFuture.supplyAsync(()->{
                     try {
                         return checkingProcess.call();
                     } catch (Exception e) {
-                        throw new RuntimeException(e);
+                        checkingProcess.checkingProcessFaild(e);
+                        return checkingProcess.getLink();
                     }
-                }, virtualThreadPool).exceptionally(checkingProcess::checkingProcessFaild);
+                }, virtualThreadPool);
                 futures.add(future);
             }
             log.info("Recursive done");
@@ -47,10 +48,8 @@ public class CheckingTask extends RecursiveTask<List<CompletableFuture<Link>>> {
             //si le nombre de lien est trop grand pour etre executer sur un thread
 
             int mid = (low + high) / 2;
-            List<String> leftList = links.subList(low, mid);
-            List<String> rightList = links.subList(mid,high);
-            CheckingTask leftTask = new CheckingTask(leftList,leftList.size()-1,0,max,timeout,userAgent,virtualThreadPool);
-            CheckingTask rightTask = new CheckingTask(rightList,rightList.size()-1,0,max,timeout,userAgent,virtualThreadPool);
+            CheckingTask leftTask = new CheckingTask(links,mid,low,max,timeout,userAgent,virtualThreadPool);
+            CheckingTask rightTask = new CheckingTask(links,high,mid,max,timeout,userAgent,virtualThreadPool);
             leftTask.fork();
             List<CompletableFuture<Link>> futures = new ArrayList<>();
             futures.addAll(rightTask.compute());

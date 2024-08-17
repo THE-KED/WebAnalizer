@@ -13,7 +13,6 @@ public class Link {
         this.href = href;
         this.isReacheble = false;
     }
-
     public void validate() {
         this.isReacheble = true;
     }

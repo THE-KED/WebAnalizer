@@ -2,6 +2,7 @@ package com.crawling.webanalyzer.services;
 
 import com.crawling.webanalyzer.models.Link;
 import com.crawling.webanalyzer.models.PageInfos;
+import com.crawling.webanalyzer.services.domains.DomainLinkMapper;
 import com.crawling.webanalyzer.services.execution.tasks.CheckingTask;
 import com.crawling.webanalyzer.services.scrapper.*;
 import lombok.Data;
@@ -15,8 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.context.annotation.SessionScope;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
@@ -41,7 +40,7 @@ public class AnalizeService {
     private PageInfos currentPageInfos;
     private Document currentPage;
     private String currentUrl;
-    private List<String>[] links;
+    private List<String> links;
     private ArrayList<Link> checkedLinks = new ArrayList<>();
 
     private void init(){
@@ -58,29 +57,25 @@ public class AnalizeService {
     }
 
     //recupere les informations de la page (titre, version html, nombre de rubriques, presence d'un formulaire d'authentification)
-    public void loadInfos() throws URISyntaxException {
+    public void loadInfos(){
         this.currentPageInfos = new PageInfos();
         this.currentPageInfos.setPageTitle(TitleDetector.detect(this.currentPage));
         this.currentPageInfos.setHtmlVersion(VersionDetector.detect(this.currentPage));
         this.currentPageInfos.setRubriquesNumber(RubriqueDetector.detect(this.currentPage));
         this.currentPageInfos.setHadAuthForm(AuthFormDetector.detect(this.currentPage));
+        this.currentPageInfos.setLinks(LinksDetector.detect(this.currentPage));
+        this.currentPageInfos.setLinksByDomain(DomainLinkMapper.map(this.currentPageInfos.getLinks()));
+        this.links = this.currentPageInfos.getLinks();
 
-        String domain = new URI(this.currentUrl).getAuthority();
-
-        this.links = LinksDetector.detect(this.currentPage, domain);
     }
-
-
 
     //validations des liens de la page.
     @Async
     public CompletableFuture<ArrayList<Link>> checkLinks(){
-        ArrayList<String> allLinks = new ArrayList<>();
-        allLinks.addAll(this.links[0]);
-        allLinks.addAll(this.links[1]);
-
+        int startIndex = 0;
+        int endIndex =links.size()-1;
         CheckingTask checkingTask = new CheckingTask(
-                allLinks,allLinks.size()-1,0,this.maxLinkByThreads,timeout,userAgent,this.virtualThreadPool);
+                links,endIndex,startIndex,this.maxLinkByThreads,timeout,userAgent,this.virtualThreadPool);
         List<CompletableFuture<Link>> futures = this.forkJoinPool.invoke(checkingTask);
 
         // Collecte des résultats de manière non bloquante
@@ -92,6 +87,5 @@ public class AnalizeService {
 
         return allResultsFuture.thenApply(_ -> this.checkedLinks);
     }
-
 
 }

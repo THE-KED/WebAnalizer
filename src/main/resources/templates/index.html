@@ -41,8 +41,8 @@
 <!--                    <td th:text="${rubriques}"></td>-->
                     <td class="sub--table--wrapper">
                         <table class="sub--table">
-                            <tr th:each="rub, iterStat : ${info.rubriquesNumber}">
-                                <td th:if="${rub[0]!=0}" th:text="'Rubrique level h' +${iterStat.index +1}+ ' : ' + ${rub[0]}"></td>
+                            <tr th:each="rubriques : ${info.rubriquesNumber}">
+                                <td th:text="'Rubrique level '+${rubriques.key}+' : '+${rubriques.value}"></td>
                             </tr>
                         </table>
                     </td>
@@ -51,8 +51,9 @@
                     <th scope="row">Links : </th>
                     <td class="sub--table--wrapper">
                         <table class="sub--table">
-                            <tr><td th:text="'interns links numbers : ' + ${internsLinksNb}"></td></tr>
-                            <tr><td th:text="'externs links numbers : ' + ${externsLinksNb}"></td></tr>
+                            <tr th:each="domain : ${info.linksByDomain}">
+                                <td th:text="${domain.key}+' : ' + ${domain.value.size}"></td>
+                            </tr>
                         </table>
                     </td>
                 </tr>

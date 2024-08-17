@@ -17,7 +17,6 @@ public class AuthFormDetector{
         for(Element element:elements) {
             Elements el = element.children();
             for (Element child:el) {
-                log.info(child.toString());
                 if(!child.select("input[type=password]").isEmpty()) {
                         return true;
                 }

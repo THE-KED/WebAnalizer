@@ -13,7 +13,7 @@ public class Initialisation {
     // Initialisation des services et autres objets nécessaires à l'application
     @Bean("forkJoinPool")
     ForkJoinPool pool(){
-        return new ForkJoinPool();
+        return ForkJoinPool.commonPool();
     }
 
     @Bean("virtualThreadPool")

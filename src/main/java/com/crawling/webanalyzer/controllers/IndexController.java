@@ -36,12 +36,9 @@ public class IndexController {
             // chargement des infos du document html dans le service.
             this.analizeService.loadInfos();
 
-            int internsLinksNb = this.analizeService.getLinks()[0].size();
-            int externsLinksNb = this.analizeService.getLinks()[1].size();
 
             model.addAttribute("info",this.analizeService.getCurrentPageInfos());
-            model.addAttribute("internsLinksNb",internsLinksNb);
-            model.addAttribute("externsLinksNb",externsLinksNb);
+
 
             return "index";
 
