@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -18,7 +19,7 @@ public class LinksController {
     private AnalizeService analizeService;
 
     @GetMapping("/check/links")
-    public ArrayList<Link> getNbValidesLinks() throws ExecutionException, InterruptedException, TimeoutException {
+    public List<Link> getNbValidesLinks() throws ExecutionException, InterruptedException, TimeoutException {
         analizeService.setCheckedLinks(new ArrayList<Link>());
         return analizeService.checkLinks().get(3, TimeUnit.MINUTES);
     }

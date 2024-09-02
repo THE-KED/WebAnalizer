@@ -12,7 +12,6 @@ public class PageInfos {
     private String pageTitle;
     private Map<String,Integer> rubriquesNumber;
     private List<String> links;
-    private List<String> domains;
     private Map<String,List<String>> linksByDomain;
     private boolean hadAuthForm;
 }

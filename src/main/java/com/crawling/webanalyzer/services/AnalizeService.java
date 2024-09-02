@@ -3,14 +3,11 @@ package com.crawling.webanalyzer.services;
 import com.crawling.webanalyzer.models.Link;
 import com.crawling.webanalyzer.models.PageInfos;
 import com.crawling.webanalyzer.services.domains.DomainLinkMapper;
-import com.crawling.webanalyzer.services.execution.tasks.CheckingTask;
 import com.crawling.webanalyzer.services.scrapper.*;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.jsoup.nodes.Document;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.annotation.SessionScope;
@@ -18,47 +15,43 @@ import org.springframework.web.context.annotation.SessionScope;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 
 @Service
 @SessionScope
+@Slf4j
 @Data
 public class AnalizeService {
 
-    @Autowired
-    private ForkJoinPool forkJoinPool;
-    @Autowired
-    private ExecutorService virtualThreadPool;
-    @Value("${maxLinkByThreads}")
-    private int maxLinkByThreads;
-    @Value("${requestTimeout}")
-    private int timeout;
-    @Value("${userAgent}")
-    private String userAgent;
-
-    private static final Logger log = LoggerFactory.getLogger(AnalizeService.class);
+    private final ExecutorService virtualThreadPool;
+    private final LinkCheckingService linkCheckingService;
     private PageInfos currentPageInfos;
     private Document currentPage;
-    private String currentUrl;
     private List<String> links;
     private ArrayList<Link> checkedLinks = new ArrayList<>();
+
+    @Autowired
+    public AnalizeService(ExecutorService virtualThreadPool, LinkCheckingService linkCheckingService){
+        this.virtualThreadPool = virtualThreadPool;
+        this.linkCheckingService = linkCheckingService;
+    }
 
     private void init(){
         this.currentPageInfos=null;
         this.currentPage=null;
-        this.currentUrl=null;
+        this.currentPageInfos = new PageInfos();
+        this.currentPageInfos.setLinks(new ArrayList<String>());
     }
 
     //recupere le document Html de la page depuis l'url
     public void loadPage(String url) throws IOException {
         this.init();
         this.currentPage = Extractor.Extract(url);
-        this.currentUrl = url;
     }
 
     //recupere les informations de la page (titre, version html, nombre de rubriques, presence d'un formulaire d'authentification)
     public void loadInfos(){
-        this.currentPageInfos = new PageInfos();
         this.currentPageInfos.setPageTitle(TitleDetector.detect(this.currentPage));
         this.currentPageInfos.setHtmlVersion(VersionDetector.detect(this.currentPage));
         this.currentPageInfos.setRubriquesNumber(RubriqueDetector.detect(this.currentPage));
@@ -71,21 +64,21 @@ public class AnalizeService {
 
     //validations des liens de la page.
     @Async
-    public CompletableFuture<ArrayList<Link>> checkLinks(){
-        int startIndex = 0;
-        int endIndex =links.size()-1;
-        CheckingTask checkingTask = new CheckingTask(
-                links,endIndex,startIndex,this.maxLinkByThreads,timeout,userAgent,this.virtualThreadPool);
-        List<CompletableFuture<Link>> futures = this.forkJoinPool.invoke(checkingTask);
+    public CompletableFuture<List<Link>> checkLinks(){
 
-        // Collecte des résultats de manière non bloquante
-        CompletableFuture<List<Link>> allResultsFuture = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                .thenApply(_ -> futures.stream()
-                        .map(CompletableFuture::join)
-                        .toList());
-        allResultsFuture.thenAccept(results -> this.checkedLinks.addAll(results));
+        var checkingProcess = links.stream()
+                .map(Link::new)
+                .map(link -> CompletableFuture.supplyAsync(
+                        ()->linkCheckingService.check(link),virtualThreadPool)
+                ).toList();
 
-        return allResultsFuture.thenApply(_ -> this.checkedLinks);
+        CompletableFuture<List<Link>> listCompletableFuture = CompletableFuture.allOf(
+                    checkingProcess.toArray(new CompletableFuture[0])
+                ).thenApply(_ -> checkingProcess.stream().map(CompletableFuture::join)
+                .toList());
+        listCompletableFuture.thenAccept(result -> this.checkedLinks.addAll(result));
+
+        return listCompletableFuture.thenApply(_ -> this.checkedLinks);
     }
 
 }

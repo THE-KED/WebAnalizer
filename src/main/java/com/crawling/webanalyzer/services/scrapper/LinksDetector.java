@@ -3,12 +3,7 @@ package com.crawling.webanalyzer.services.scrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.net.MalformedURLException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.List;
 
@@ -35,7 +30,7 @@ public class LinksDetector{
             return true;
 
         } catch (Exception e) {
-            log.error("{}, href = {}",e.getMessage(),href);
+            log.warn("{}, href = {}",e.getMessage(),href);
             return false;
         }
     }
